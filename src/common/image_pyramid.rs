@@ -178,42 +178,36 @@ pub fn resize_image(src: &ImageData, dest: &mut Vec<u8>, width: u32, height: u32
         return;
     }
 
-    #[allow(clippy::uninit_vec)]
-    unsafe {
-        let area = width as usize * height as usize;
-        dest.reserve(area);
-        dest.set_len(area);
-    }
+    let area = width as usize * height as usize;
+    dest.resize(area, 0);
 
-    let dest = dest.as_mut_ptr();
-    let src_data = src.data().as_ptr();
+    let dest = dest.as_mut_slice();
+    let src_data = src.data();
 
     let lf_x_scl = f64::from(src.width()) / f64::from(width);
     let lf_y_scl = f64::from(src.height()) / f64::from(height);
 
-    unsafe {
-        for y in 0..height {
-            for x in 0..width {
-                let lf_x_s = lf_x_scl * f64::from(x);
-                let lf_y_s = lf_y_scl * f64::from(y);
+    for y in 0..height {
+        for x in 0..width {
+            let lf_x_s = lf_x_scl * f64::from(x);
+            let lf_y_s = lf_y_scl * f64::from(y);
 
-                let n_x_s = cmp::min(lf_x_s as u32, src.width() - 2);
-                let n_y_s = cmp::min(lf_y_s as u32, src.height() - 2);
+            let n_x_s = cmp::min(lf_x_s as u32, src.width() - 2);
+            let n_y_s = cmp::min(lf_y_s as u32, src.height() - 2);
 
-                let lf_weight_x = lf_x_s - f64::from(n_x_s);
-                let lf_weight_y = lf_y_s - f64::from(n_y_s);
+            let lf_weight_x = lf_x_s - f64::from(n_x_s);
+            let lf_weight_y = lf_y_s - f64::from(n_y_s);
 
-                let d1 = f64::from(*src_data.offset((n_y_s * src.width() + n_x_s) as isize));
-                let d2 = f64::from(*src_data.offset((n_y_s * src.width() + n_x_s + 1) as isize));
-                let d3 = f64::from(*src_data.offset(((n_y_s + 1) * src.width() + n_x_s) as isize));
-                let d4 =
-                    f64::from(*src_data.offset(((n_y_s + 1) * src.width() + n_x_s + 1) as isize));
+            let d1 = f64::from(*src_data.get((n_y_s * src.width() + n_x_s) as usize).unwrap());
+            let d2 = f64::from(*src_data.get((n_y_s * src.width() + n_x_s + 1) as usize).unwrap());
+            let d3 = f64::from(*src_data.get(((n_y_s + 1) * src.width() + n_x_s) as usize).unwrap());
+            let d4 =
+                f64::from(*src_data.get(((n_y_s + 1) * src.width() + n_x_s + 1) as usize).unwrap());
 
-                let dest_val = (1.0 - lf_weight_y) * ((1.0 - lf_weight_x) * d1 + lf_weight_x * d2)
-                    + lf_weight_y * ((1.0 - lf_weight_x) * d3 + lf_weight_x * d4);
+            let dest_val = (1.0 - lf_weight_y) * ((1.0 - lf_weight_x) * d1 + lf_weight_x * d2)
+                + lf_weight_y * ((1.0 - lf_weight_x) * d3 + lf_weight_x * d4);
 
-                *dest.offset((y * width + x) as isize) = dest_val as u8;
-            }
+            *dest.get_mut((y * width + x) as usize).unwrap() = dest_val as u8;
         }
     }
 }
