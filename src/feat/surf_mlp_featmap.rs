@@ -182,9 +182,9 @@ impl SurfMlpFeatureMap {
         unsafe {
             self.fill_integral_channel(grad_x_ptr, 0);
             self.fill_integral_channel(grad_y_ptr, 4);
-            math::abs(grad_x_ptr, img_buf_ptr as *mut i32, self.length);
+            math::abs(&self.grad_x, &mut self.img_buf);
             self.fill_integral_channel(img_buf_ptr, 1);
-            math::abs(grad_y_ptr, img_buf_ptr as *mut i32, self.length);
+            math::abs(&self.grad_y, &mut self.img_buf);
             self.fill_integral_channel(img_buf_ptr, 5);
         }
 

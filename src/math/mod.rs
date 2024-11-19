@@ -30,10 +30,9 @@ pub fn square(src: &[i32], dest: &mut [u32]) {
     }
 }
 
-pub unsafe fn abs(src: *const i32, dest: *mut i32, length: usize) {
-    for i in 0..length as isize {
-        let value = *src.offset(i);
-        *dest.offset(i) = if value >= 0 { value } else { -value };
+pub fn abs(src: &[i32], dest: &mut [i32]) {
+    for (src, dest) in src.iter().copied().zip(dest.iter_mut()) {
+        *dest = if src >= 0 { src } else { -src };
     }
 }
 
@@ -71,9 +70,10 @@ mod tests {
 
     #[test]
     fn test_abs() {
-        let mut vec = vec![-1, 2, -3];
-        unsafe { abs(vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
-        assert_eq!(vec![1, 2, 3], vec);
+        let vec_src = vec![-1, 2, -3];
+        let mut vec_dest = vec![0; 3];
+        abs(vec_src.as_slice(), vec_dest.as_mut_slice());
+        assert_eq!(vec![1, 2, 3], vec_dest);
     }
 
     #[test]

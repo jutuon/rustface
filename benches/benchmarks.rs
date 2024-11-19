@@ -78,7 +78,7 @@ fn bench_abs(c: &mut Criterion) {
         let vec: Vec<_> = (0..500).map(|i| if i % 3 == 0 { i } else { -i }).collect();
         let mut dest = vec![0; 500];
         b.iter(|| {
-            unsafe { abs(vec.as_ptr(), dest.as_mut_ptr(), vec.len()) };
+            abs(vec.as_slice(), dest.as_mut_slice());
         })
     });
 }
@@ -170,10 +170,10 @@ fn bench_abs_compare(c: &mut Criterion) {
         })
     });
 
-    let notsafe = Fun::new("unsafe", |b, input: &Vec<i32>| {
+    let iterator = Fun::new("iterator", |b, input: &Vec<i32>| {
         let mut target: Vec<i32> = vec![0; input.len()];
         b.iter(|| {
-            unsafe { abs(input.as_ptr(), target.as_mut_ptr(), input.len()) };
+            abs(input.as_slice(), target.as_mut_slice());
         })
     });
 
@@ -183,7 +183,7 @@ fn bench_abs_compare(c: &mut Criterion) {
         testvec.push(i as i32);
     }
 
-    let functions = vec![naive, naive_iterator, notsafe];
+    let functions = vec![naive, naive_iterator, iterator];
 
     c.bench_functions("abs_comparison", functions, testvec);
 }
