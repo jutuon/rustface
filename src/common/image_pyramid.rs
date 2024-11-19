@@ -178,6 +178,7 @@ pub fn resize_image(src: &ImageData, dest: &mut Vec<u8>, width: u32, height: u32
         return;
     }
 
+    #[allow(clippy::uninit_vec)]
     unsafe {
         let area = width as usize * height as usize;
         dest.reserve(area);

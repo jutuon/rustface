@@ -63,6 +63,7 @@ impl Detector for FuStDetector {
         self.wnd_size = wnd_size;
     }
 
+    #[allow(clippy::absurd_extreme_comparisons)]
     fn set_slide_window_step(&mut self, step_x: u32, step_y: u32) {
         if step_x <= 0 {
             panic!("Illegal horizontal step: {}", step_x);
