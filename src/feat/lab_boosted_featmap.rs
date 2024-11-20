@@ -153,54 +153,44 @@ impl LabBoostedFeatureMap {
     fn compute_integral_images(&mut self, input: &[u8]) {
         assert_eq!(input.len(), self.length);
 
-        unsafe {
-            math::copy_u8_to_i32(input, &mut self.int_img);
-            math::square(&self.int_img, &mut self.square_int_img);
+        math::copy_u8_to_i32(input, &mut self.int_img);
+        math::square(&self.int_img, &mut self.square_int_img);
 
-            LabBoostedFeatureMap::compute_integral(
-                self.int_img.as_mut_ptr(),
-                self.width,
-                self.height,
-            );
-            LabBoostedFeatureMap::compute_integral(
-                self.square_int_img.as_mut_ptr(),
-                self.width,
-                self.height,
-            );
-        }
+        LabBoostedFeatureMap::compute_integral(
+            &mut self.int_img,
+            self.width,
+            self.height,
+        );
+        LabBoostedFeatureMap::compute_integral(
+            &mut self.square_int_img,
+            self.width,
+            self.height,
+        );
     }
 
-    unsafe fn compute_integral<T: Integer + WrappingAdd + Copy>(
-        data: *mut T,
+    fn compute_integral<T: Integer + WrappingAdd + Copy>(
+        data: &mut [T],
         width: u32,
         height: u32,
     ) {
-        let mut src = data;
-        let mut dest = data;
-        let mut dest_previous_row = dest;
-
-        *dest = *src;
-        src = src.offset(1);
-        for _ in 1..width {
-            *dest.offset(1) = *dest + *src;
-
-            src = src.offset(1);
-            dest = dest.offset(1);
+        let mut data_iter_mut = data.iter_mut().take(width as usize);
+        let mut src = data_iter_mut.next().unwrap();
+        for dest in data_iter_mut {
+            *dest = *src + *dest;
+            src = dest;
         }
 
-        dest = dest.offset(1);
-        for _ in 1..height {
+        let mut row_iter = data.chunks_exact_mut(width as usize).take(height as usize);
+        let mut previous_row = row_iter.next().unwrap();
+        for row in row_iter {
             let mut s: T = num::zero();
-            for _ in 0..width {
-                s = s + *src;
+            for (dest_previous_row, dest) in previous_row.iter().zip(row.iter_mut()) {
+                s = s + *dest;
                 // overflow does happen here for the list of squares..
                 // original code does not seem to worry about this though
                 *dest = (*dest_previous_row).wrapping_add(&s);
-
-                src = src.offset(1);
-                dest = dest.offset(1);
-                dest_previous_row = dest_previous_row.offset(1);
             }
+            previous_row = row;
         }
     }
 
