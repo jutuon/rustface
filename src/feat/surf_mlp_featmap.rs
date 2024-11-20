@@ -132,45 +132,39 @@ impl SurfMlpFeatureMap {
     }
 
     fn compute_grad_y(&mut self) {
-        let input = self.img_buf.as_ptr();
-        let mut dy = self.grad_y.as_mut_ptr();
-        let len = self.width as usize;
+        let mut src_row_iter = self.img_buf.chunks_exact(self.width as usize);
+        let src_row_first = src_row_iter.next().unwrap();
+        let src_row_second = src_row_iter.next().unwrap();
+        math::vector_sub_safe(src_row_second, src_row_first, &mut self.grad_y);
+        math::vector_mul(&mut self.grad_y[..self.width as usize], 2);
 
-        unsafe {
-            math::vector_sub(input.offset(self.width as isize), input, dy, len);
-            math::vector_add(dy, dy, dy, len);
+        let row_len = self.width as usize;
+        let last_row_start = self.grad_y.len() - row_len;
 
-            let step = self.width as usize;
-            let grad_y_stop = self.grad_y.len() - step;
+        #[cfg(feature = "rayon")]
+        let iter = self.img_buf.par_chunks_exact(row_len)
+            .zip(self.img_buf.par_chunks_exact(row_len).skip(2))
+            .zip(self.grad_y[row_len..last_row_start].par_chunks_exact_mut(row_len));
 
-            #[cfg(feature = "rayon")]
-            let it = self
-                .img_buf
-                .par_chunks(step)
-                .zip(self.grad_y[step..grad_y_stop].par_chunks_mut(step));
+        #[cfg(not(feature = "rayon"))]
+        let iter = self.img_buf.chunks_exact(row_len)
+            .zip(self.img_buf.chunks_exact(row_len).skip(2))
+            .zip(self.grad_y[row_len..last_row_start].chunks_exact_mut(row_len));
 
-            #[cfg(not(feature = "rayon"))]
-            let it = self
-                .img_buf
-                .chunks(step)
-                .zip(self.grad_y[step..grad_y_stop].chunks_mut(step));
+        iter.for_each(|((src_row, src_row_next_twice), dest)| {
+            math::vector_sub_safe(src_row_next_twice, src_row, dest);
+        });
 
-            it.for_each(|(inputs, outputs)| {
-                let src = inputs.as_ptr();
-                let dest = outputs.as_mut_ptr();
-                math::vector_sub(src.add(step << 1), src, dest, len);
-            });
-
-            let offset = ((self.height - 1) * self.width) as isize;
-            dy = dy.offset(offset);
-            math::vector_sub(
-                input.offset(offset),
-                input.offset(offset - self.width as isize),
-                dy,
-                len,
-            );
-            math::vector_add(dy, dy, dy, len);
-        }
+        let mut src_row_iter = self.img_buf.chunks_exact(self.width as usize);
+        let src_row_last = src_row_iter.next_back().unwrap();
+        let src_row_second_last = src_row_iter.next_back().unwrap();
+        let dest_row_last = self.grad_y.chunks_exact_mut(self.width as usize).last().unwrap();
+        math::vector_sub_safe(
+            src_row_last,
+            src_row_second_last,
+            dest_row_last,
+        );
+        math::vector_mul(dest_row_last, 2);
     }
 
     fn compute_integral_images(&mut self) {

@@ -60,6 +60,12 @@ pub fn vector_sub_safe(left: &[i32], right: &[i32], dest: &mut [i32]) {
     }
 }
 
+pub fn vector_mul(src_and_dest: &mut[i32], value: i32) {
+    for src_and_dest in src_and_dest.iter_mut() {
+        *src_and_dest *= value;
+    }
+}
+
 pub fn vector_inner_product(left: &[f32], right: &[f32]) -> f32 {
     left.iter()
         .copied()
@@ -100,6 +106,13 @@ mod tests {
         let mut vec = vec![1, 2, 3];
         unsafe { vector_sub(vec.as_ptr(), vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
         assert_eq!(vec![0, 0, 0], vec);
+    }
+
+    #[test]
+    fn test_vector_mul() {
+        let mut vec = vec![1, 2, 3];
+        vector_mul(&mut vec,2);
+        assert_eq!(vec![2, 4, 6], vec);
     }
 
     #[test]
