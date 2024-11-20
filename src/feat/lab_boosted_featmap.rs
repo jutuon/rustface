@@ -244,54 +244,50 @@ impl LabBoostedFeatureMap {
         let height = self.height - self.rect_height * self.num_rect;
         let offset = self.width * self.rect_height;
 
-        let feat_map_ptr = self.feat_map.as_mut_ptr();
+        for r in 0..(height + 1) {
+            for c in 0..(width + 1) {
+                let dest = &mut self.feat_map[(r * self.width + c) as usize];
+                *dest = 0;
 
-        unsafe {
-            for r in 0..(height + 1) {
-                for c in 0..(width + 1) {
-                    let dest = feat_map_ptr.offset((r * self.width + c) as isize);
-                    *dest = 0;
+                let white_rect_sum = self.rect_sum
+                    [((r + self.rect_height) * self.width + c + self.rect_width) as usize];
 
-                    let white_rect_sum = self.rect_sum
-                        [((r + self.rect_height) * self.width + c + self.rect_width) as usize];
+                let mut black_rect_idx = r * self.width + c;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x80
+                };
 
-                    let mut black_rect_idx = r * self.width + c;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x80
-                    };
+                black_rect_idx += self.rect_width;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x40
+                };
+                black_rect_idx += self.rect_width;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x20
+                };
 
-                    black_rect_idx += self.rect_width;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x40
-                    };
-                    black_rect_idx += self.rect_width;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x20
-                    };
+                black_rect_idx += offset;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x08
+                };
+                black_rect_idx += offset;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x01
+                };
 
-                    black_rect_idx += offset;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x08
-                    };
-                    black_rect_idx += offset;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x01
-                    };
+                black_rect_idx -= self.rect_width;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x02
+                };
+                black_rect_idx -= self.rect_width;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x04
+                };
 
-                    black_rect_idx -= self.rect_width;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x02
-                    };
-                    black_rect_idx -= self.rect_width;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x04
-                    };
-
-                    black_rect_idx -= offset;
-                    if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
-                        *dest |= 0x10
-                    };
-                }
+                black_rect_idx -= offset;
+                if white_rect_sum >= self.rect_sum[black_rect_idx as usize] {
+                    *dest |= 0x10
+                };
             }
         }
     }
