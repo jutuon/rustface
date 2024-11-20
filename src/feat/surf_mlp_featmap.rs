@@ -20,6 +20,7 @@ use crate::common::{Rectangle, Seq};
 use crate::feat::FeatureMap;
 use crate::math;
 use crate::ImageData;
+use std::ops::Deref;
 use std::ptr;
 
 #[cfg(feature = "rayon")]
@@ -243,7 +244,7 @@ impl SurfMlpFeatureMap {
         }
     }
 
-    unsafe fn compute_feature_vector(&mut self, feature_id: usize, roi: Rectangle) {
+    fn compute_feature_vector(&mut self, feature_id: usize, roi: Rectangle) {
         let feature = self.feature_pool.get_feature(feature_id);
 
         let init_cell_x = roi.x() + feature.patch.x();
@@ -254,21 +255,19 @@ impl SurfMlpFeatureMap {
         let cell_height: isize = (feature.patch.height() / feature.num_cell_per_col) as isize;
         let row_width: isize = (self.width as isize) * k_num_int_channel;
 
-        let val = 0;
-        let mut cell_top_left: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
-        let mut cell_top_right: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
-        let mut cell_bottom_left: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
-        let mut cell_bottom_right: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
+        let mut cell_top_left = [Cursor::empty(); FeaturePool::K_NUM_INT_CHANNEL as usize];
+        let mut cell_top_right = [Cursor::empty(); FeaturePool::K_NUM_INT_CHANNEL as usize];
+        let mut cell_bottom_left = [Cursor::empty(); FeaturePool::K_NUM_INT_CHANNEL as usize];
+        let mut cell_bottom_right = [Cursor::empty(); FeaturePool::K_NUM_INT_CHANNEL as usize];
 
         let mut dest_iter = self.feature_vectors[feature_id].iter_mut();
-        let int_img_ptr = self.int_img.as_ptr();
-        let mut offset: isize;
+        let int_img = self.int_img.as_slice();
 
         match (init_cell_x, init_cell_y) {
             (0, 0) => {
-                offset = row_width * (cell_height - 1) + cell_width - k_num_int_channel;
+                let mut offset: isize = row_width * (cell_height - 1) + cell_width - k_num_int_channel;
                 for i in 0..k_num_int_channel as usize {
-                    cell_bottom_right[i] = int_img_ptr.offset(offset);
+                    cell_bottom_right[i] = Cursor::with_offset(int_img, offset);
                     offset += 1;
                     *dest_iter.next().unwrap() = *cell_bottom_right[i];
                     cell_top_right[i] = cell_bottom_right[i];
@@ -283,10 +282,10 @@ impl SurfMlpFeatureMap {
                 }
             }
             (_, 0) => {
-                offset =
+                let mut offset: isize =
                     row_width * (cell_height - 1) + (init_cell_x - 1) as isize * k_num_int_channel;
                 for i in 0..k_num_int_channel as usize {
-                    cell_bottom_left[i] = int_img_ptr.offset(offset);
+                    cell_bottom_left[i] = Cursor::with_offset(int_img, offset);
                     offset += 1;
                     cell_bottom_right[i] = cell_bottom_left[i].offset(cell_width);
                     *dest_iter.next().unwrap() = *cell_bottom_right[i] - *cell_bottom_left[i];
@@ -302,12 +301,12 @@ impl SurfMlpFeatureMap {
                 }
             }
             (0, _) => {
-                let mut tmp_cell_top_right: Vec<*const i32> =
-                    vec![&val; k_num_int_channel as usize];
+                let mut tmp_cell_top_right: Vec<Cursor<'_>> =
+                    vec![Cursor::empty(); k_num_int_channel as usize];
 
-                offset = row_width * ((init_cell_y - 1) as isize) + cell_width - k_num_int_channel;
+                let mut offset: isize = row_width * ((init_cell_y - 1) as isize) + cell_width - k_num_int_channel;
                 for i in 0..k_num_int_channel as usize {
-                    cell_top_right[i] = int_img_ptr.offset(offset);
+                    cell_top_right[i] = Cursor::with_offset(int_img, offset);
                     offset += 1;
                     cell_bottom_right[i] = cell_top_right[i].offset(row_width * cell_height);
                     tmp_cell_top_right[i] = cell_bottom_right[i];
@@ -330,13 +329,13 @@ impl SurfMlpFeatureMap {
                     .clone_from_slice(&tmp_cell_top_right[..k_num_int_channel as usize]);
             }
             (_, _) => {
-                let mut tmp_cell_top_right: Vec<*const i32> =
-                    vec![&val; k_num_int_channel as usize];
+                let mut tmp_cell_top_right: Vec<Cursor<'_>> =
+                    vec![Cursor::empty(); k_num_int_channel as usize];
 
-                offset = row_width * ((init_cell_y - 1) as isize)
+                let mut offset: isize = row_width * ((init_cell_y - 1) as isize)
                     + (init_cell_x - 1) as isize * k_num_int_channel;
                 for i in 0..k_num_int_channel as usize {
-                    cell_top_left[i] = int_img_ptr.offset(offset);
+                    cell_top_left[i] = Cursor::with_offset(int_img, offset);
                     offset += 1;
                     cell_top_right[i] = cell_top_left[i].offset(cell_width);
                     cell_bottom_left[i] = cell_top_left[i].offset(row_width * cell_height);
@@ -364,7 +363,7 @@ impl SurfMlpFeatureMap {
             }
         }
 
-        offset = cell_height * row_width - feature.patch.width() as isize * k_num_int_channel
+        let offset: isize = cell_height * row_width - feature.patch.width() as isize * k_num_int_channel
             + cell_width;
         for _ in 1..feature.num_cell_per_row {
             if init_cell_x == 0 {
@@ -441,6 +440,49 @@ impl SurfMlpFeatureMap {
     #[inline]
     pub fn get_feature_vector_dim(&self, feature_id: usize) -> usize {
         self.feature_pool.get_feature_vector_dim(feature_id)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Cursor<'a> {
+    all_data: &'a [i32],
+    offset: isize,
+    data: i32,
+}
+
+impl <'a> Cursor<'a> {
+    fn with_offset(all_data: &'a [i32], offset: isize) -> Self {
+        Self {
+            all_data,
+            offset,
+            data: all_data[offset as usize],
+        }
+    }
+
+    fn empty() -> Self {
+        Self {
+            all_data: &[],
+            offset: 0,
+            data: 0,
+        }
+    }
+
+    fn offset(&self, offset: isize) -> Self {
+        let new_offset = self.offset + offset;
+        let data = self.all_data[new_offset as usize];
+        Self {
+            all_data: self.all_data,
+            offset: new_offset,
+            data,
+        }
+    }
+}
+
+impl Deref for Cursor<'_> {
+    type Target = i32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
 }
 
