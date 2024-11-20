@@ -54,6 +54,12 @@ pub unsafe fn vector_sub(left: *const i32, right: *const i32, dest: *mut i32, le
     }
 }
 
+pub fn vector_sub_safe(left: &[i32], right: &[i32], dest: &mut [i32]) {
+    for ((left, right), dest) in left.iter().copied().zip(right.iter().copied()).zip(dest.iter_mut()) {
+        *dest = left - right;
+    }
+}
+
 pub fn vector_inner_product(left: &[f32], right: &[f32]) -> f32 {
     left.iter()
         .copied()

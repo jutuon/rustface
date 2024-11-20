@@ -112,23 +112,22 @@ impl SurfMlpFeatureMap {
     }
 
     fn compute_grad_x(&mut self) {
-        let input = self.img_buf.as_ptr();
-        let dx = self.grad_x.as_mut_ptr();
-        let len = (self.width - 2) as usize;
+        for (src_row, dest_row) in self.img_buf.chunks_exact_mut(self.width as usize)
+            .zip(self.grad_x.chunks_exact_mut(self.width as usize)) {
 
-        unsafe {
-            for r in 0..self.height {
-                let offset = (r * self.width) as isize;
-                let mut src = input.offset(offset);
-                let mut dest = dx.offset(offset);
-                *dest = ((*(src.offset(1))) - (*src)) << 1;
-                math::vector_sub(src.offset(2), src, dest.offset(1), len);
+            let mut src_iter = src_row.iter().copied();
+            let src_first = src_iter.next().unwrap();
+            let src_second = src_iter.next().unwrap();
+            *dest_row.first_mut().unwrap() = (src_second - src_first) << 1;
 
-                let offset = (self.width - 1) as isize;
-                src = src.offset(offset);
-                dest = dest.offset(offset);
-                *dest = ((*src) - (*(src.offset(-1)))) << 1;
-            }
+            let (_, src_offset_2) = src_row.split_at(2);
+            let (_, dest_offset_1) = dest_row.split_at_mut(1);
+            math::vector_sub_safe(src_offset_2, src_row, dest_offset_1);
+
+            let mut src_iter = src_row.iter().copied();
+            let src_last = src_iter.next_back().unwrap();
+            let src_second_last = src_iter.next_back().unwrap();
+            *dest_row.last_mut().unwrap() = (src_last - src_second_last) << 1;
         }
     }
 
