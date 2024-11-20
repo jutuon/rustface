@@ -175,30 +175,21 @@ impl SurfMlpFeatureMap {
     }
 
     fn compute_integral_images(&mut self) {
-        let grad_x_ptr = self.grad_x.as_ptr();
-        let grad_y_ptr = self.grad_y.as_ptr();
-        let img_buf_ptr = self.img_buf.as_ptr();
-
-        unsafe {
-            self.fill_integral_channel(grad_x_ptr, 0);
-            self.fill_integral_channel(grad_y_ptr, 4);
-            math::abs(&self.grad_x, &mut self.img_buf);
-            self.fill_integral_channel(img_buf_ptr, 1);
-            math::abs(&self.grad_y, &mut self.img_buf);
-            self.fill_integral_channel(img_buf_ptr, 5);
-        }
+        Self::fill_integral_channel(&self.grad_x, &mut self.int_img, 0);
+        Self::fill_integral_channel(&self.grad_y, &mut self.int_img, 4);
+        math::abs(&self.grad_x, &mut self.img_buf);
+        Self::fill_integral_channel(&self.img_buf, &mut self.int_img, 1);
+        math::abs(&self.grad_y, &mut self.img_buf);
+        Self::fill_integral_channel(&self.img_buf, &mut self.int_img, 5);
 
         self.mask_integral_channel();
         self.integral();
     }
 
-    unsafe fn fill_integral_channel(&mut self, mut src: *const i32, ch: u32) {
-        let mut dest = self.int_img.as_mut_ptr().offset(ch as isize);
-        for _ in 0..self.length {
-            *dest = *src;
-            *dest.offset(2) = *src;
-            dest = dest.offset(FeaturePool::K_NUM_INT_CHANNEL as isize);
-            src = src.offset(1);
+    fn fill_integral_channel(src: &[i32], int_img: &mut [i32], ch: u32) {
+        for (src_value, dest_vec) in src.iter().zip(int_img.chunks_exact_mut(FeaturePool::K_NUM_INT_CHANNEL as usize)) {
+            dest_vec[ch as usize] = *src_value;
+            dest_vec[ch as usize + 2] = *src_value;
         }
     }
 
