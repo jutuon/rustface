@@ -245,7 +245,6 @@ impl SurfMlpFeatureMap {
 
     unsafe fn compute_feature_vector(&mut self, feature_id: usize, roi: Rectangle) {
         let feature = self.feature_pool.get_feature(feature_id);
-        let feature_vec = self.feature_vectors[feature_id].as_mut_ptr();
 
         let init_cell_x = roi.x() + feature.patch.x();
         let init_cell_y = roi.y() + feature.patch.y();
@@ -261,7 +260,7 @@ impl SurfMlpFeatureMap {
         let mut cell_bottom_left: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
         let mut cell_bottom_right: Vec<*const i32> = vec![&val; k_num_int_channel as usize];
 
-        let mut feature_value: *mut i32 = feature_vec;
+        let mut dest_iter = self.feature_vectors[feature_id].iter_mut();
         let int_img_ptr = self.int_img.as_ptr();
         let mut offset: isize;
 
@@ -271,8 +270,7 @@ impl SurfMlpFeatureMap {
                 for i in 0..k_num_int_channel as usize {
                     cell_bottom_right[i] = int_img_ptr.offset(offset);
                     offset += 1;
-                    *feature_value = *cell_bottom_right[i];
-                    feature_value = feature_value.offset(1);
+                    *dest_iter.next().unwrap() = *cell_bottom_right[i];
                     cell_top_right[i] = cell_bottom_right[i];
                 }
 
@@ -280,8 +278,7 @@ impl SurfMlpFeatureMap {
                     for j in 0..k_num_int_channel as usize {
                         cell_bottom_left[j] = cell_bottom_right[j];
                         cell_bottom_right[j] = cell_bottom_right[j].offset(cell_width);
-                        *feature_value = *cell_bottom_right[j] - *cell_bottom_left[j];
-                        feature_value = feature_value.offset(1);
+                        *dest_iter.next().unwrap() = *cell_bottom_right[j] - *cell_bottom_left[j];
                     }
                 }
             }
@@ -292,8 +289,7 @@ impl SurfMlpFeatureMap {
                     cell_bottom_left[i] = int_img_ptr.offset(offset);
                     offset += 1;
                     cell_bottom_right[i] = cell_bottom_left[i].offset(cell_width);
-                    *feature_value = *cell_bottom_right[i] - *cell_bottom_left[i];
-                    feature_value = feature_value.offset(1);
+                    *dest_iter.next().unwrap() = *cell_bottom_right[i] - *cell_bottom_left[i];
                     cell_top_right[i] = cell_bottom_right[i];
                 }
 
@@ -301,8 +297,7 @@ impl SurfMlpFeatureMap {
                     for j in 0..k_num_int_channel as usize {
                         cell_bottom_left[j] = cell_bottom_right[j];
                         cell_bottom_right[j] = cell_bottom_right[j].offset(cell_width);
-                        *feature_value = *cell_bottom_right[j] - *cell_bottom_left[j];
-                        feature_value = feature_value.offset(1);
+                        *dest_iter.next().unwrap() = *cell_bottom_right[j] - *cell_bottom_left[j];
                     }
                 }
             }
@@ -316,8 +311,7 @@ impl SurfMlpFeatureMap {
                     offset += 1;
                     cell_bottom_right[i] = cell_top_right[i].offset(row_width * cell_height);
                     tmp_cell_top_right[i] = cell_bottom_right[i];
-                    *feature_value = *cell_bottom_right[i] - *cell_top_right[i];
-                    feature_value = feature_value.offset(1);
+                    *dest_iter.next().unwrap() = *cell_bottom_right[i] - *cell_top_right[i];
                 }
 
                 for _ in 1..feature.num_cell_per_row {
@@ -326,10 +320,9 @@ impl SurfMlpFeatureMap {
                         cell_top_right[j] = cell_top_right[j].offset(cell_width);
                         cell_bottom_left[j] = cell_bottom_right[j];
                         cell_bottom_right[j] = cell_bottom_right[j].offset(cell_width);
-                        *feature_value = *cell_bottom_right[j] + *cell_top_left[j]
+                        *dest_iter.next().unwrap() = *cell_bottom_right[j] + *cell_top_left[j]
                             - *cell_top_right[j]
                             - *cell_bottom_left[j];
-                        feature_value = feature_value.offset(1);
                     }
                 }
 
@@ -348,10 +341,9 @@ impl SurfMlpFeatureMap {
                     cell_top_right[i] = cell_top_left[i].offset(cell_width);
                     cell_bottom_left[i] = cell_top_left[i].offset(row_width * cell_height);
                     cell_bottom_right[i] = cell_bottom_left[i].offset(cell_width);
-                    *feature_value = *cell_bottom_right[i] + *cell_top_left[i]
+                    *dest_iter.next().unwrap() = *cell_bottom_right[i] + *cell_top_left[i]
                         - *cell_top_right[i]
                         - *cell_bottom_left[i];
-                    feature_value = feature_value.offset(1);
                     tmp_cell_top_right[i] = cell_bottom_right[i];
                 }
 
@@ -361,10 +353,9 @@ impl SurfMlpFeatureMap {
                         cell_top_right[j] = cell_top_right[j].offset(cell_width);
                         cell_bottom_left[j] = cell_bottom_right[j];
                         cell_bottom_right[j] = cell_bottom_right[j].offset(cell_width);
-                        *feature_value = *cell_bottom_right[j] + *cell_top_left[j]
+                        *dest_iter.next().unwrap() = *cell_bottom_right[j] + *cell_top_left[j]
                             - *cell_top_right[j]
                             - *cell_bottom_left[j];
-                        feature_value = feature_value.offset(1);
                     }
                 }
 
@@ -379,18 +370,16 @@ impl SurfMlpFeatureMap {
             if init_cell_x == 0 {
                 for j in 0..k_num_int_channel as usize {
                     cell_bottom_right[j] = cell_bottom_right[j].offset(offset);
-                    *feature_value = *cell_bottom_right[j] - *cell_top_right[j];
-                    feature_value = feature_value.offset(1);
+                    *dest_iter.next().unwrap() = *cell_bottom_right[j] - *cell_top_right[j];
                 }
             } else {
                 for j in 0..k_num_int_channel as usize {
                     cell_bottom_right[j] = cell_bottom_right[j].offset(offset);
                     cell_top_left[j] = cell_top_right[j].offset(-cell_width);
                     cell_bottom_left[j] = cell_bottom_right[j].offset(-cell_width);
-                    *feature_value = *cell_bottom_right[j] + *cell_top_left[j]
+                    *dest_iter.next().unwrap() = *cell_bottom_right[j] + *cell_top_left[j]
                         - *cell_top_right[j]
                         - *cell_bottom_left[j];
-                    feature_value = feature_value.offset(1);
                 }
             }
 
@@ -400,10 +389,9 @@ impl SurfMlpFeatureMap {
                     cell_top_right[k] = cell_top_right[k].offset(cell_width);
                     cell_bottom_left[k] = cell_bottom_right[k];
                     cell_bottom_right[k] = cell_bottom_right[k].offset(cell_width);
-                    *feature_value = *cell_bottom_right[k] + *cell_top_left[k]
+                    *dest_iter.next().unwrap() = *cell_bottom_right[k] + *cell_top_left[k]
                         - *cell_bottom_left[k]
                         - *cell_top_right[k];
-                    feature_value = feature_value.offset(1);
                 }
             }
 
