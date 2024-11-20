@@ -21,7 +21,6 @@ use crate::feat::FeatureMap;
 use crate::math;
 use crate::ImageData;
 use std::ops::Deref;
-use std::ptr;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -400,10 +399,10 @@ impl SurfMlpFeatureMap {
         }
     }
 
-    pub unsafe fn get_feature_vector(
+    pub fn get_feature_vector(
         &mut self,
         feature_id: usize,
-        feature_vec: *mut f32,
+        feature_vec: &mut [f32],
         roi: Rectangle,
     ) {
         self.compute_feature_vector(feature_id, roi);
@@ -413,9 +412,9 @@ impl SurfMlpFeatureMap {
             &mut self.feature_vectors_normalized[feature_id],
         );
 
-        let feature_vec_normalized = self.feature_vectors_normalized[feature_id].as_ptr();
-        let length = self.feature_vectors_normalized[feature_id].len();
-        ptr::copy_nonoverlapping(feature_vec_normalized, feature_vec, length);
+        let feature_vec_normalized = self.feature_vectors_normalized[feature_id].as_slice();
+        let dest = &mut feature_vec[..feature_vec_normalized.len()];
+        dest.copy_from_slice(feature_vec_normalized);
     }
 
     fn normalize_feature_vector(feature_vec: &[i32], feature_vec_normalized: &mut [f32]) {

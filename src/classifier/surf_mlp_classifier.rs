@@ -218,13 +218,11 @@ impl SurfMlpClassifier {
         bufs.output.resize(output_layer.output_size(), 0.0);
 
         {
-            let mut dest = bufs.input.as_mut_ptr();
-            unsafe {
-                for &feature_id in &self.feature_ids[..] {
-                    feature_map.get_feature_vector((feature_id - 1) as usize, dest, roi);
-                    let offset = feature_map.get_feature_vector_dim(feature_id as usize);
-                    dest = dest.add(offset);
-                }
+            let mut dest = bufs.input.as_mut_slice();
+            for &feature_id in &self.feature_ids[..] {
+                feature_map.get_feature_vector((feature_id - 1) as usize, dest, roi);
+                let offset = feature_map.get_feature_vector_dim(feature_id as usize);
+                dest = &mut dest[offset..];
             }
         }
 
