@@ -194,41 +194,23 @@ impl SurfMlpFeatureMap {
     }
 
     fn mask_integral_channel(&mut self) {
-        self.mask_integral_channel_portable();
-    }
+        let xor_bits: [u32; 4] = [0xffff_ffff, 0xffff_ffff, 0, 0];
+        for ((dx, dy), int_img_vec) in self.grad_x.iter().copied()
+            .zip(self.grad_y.iter().copied())
+            .zip(self.int_img.chunks_exact_mut(FeaturePool::K_NUM_INT_CHANNEL as usize)) {
 
-    fn mask_integral_channel_portable(&mut self) {
-        let mut grad_x_ptr = self.grad_x.as_ptr();
-        let mut grad_y_ptr = self.grad_y.as_ptr();
+            let (first, second) = int_img_vec.split_at_mut(4);
 
-        let mut dx: i32;
-        let mut dy: i32;
-        let mut dx_mask: i32;
-        let mut dy_mask: i32;
-        let mut cmp: u32;
-        let xor_bits: Vec<u32> = vec![0xffff_ffff, 0xffff_ffff, 0, 0];
+            let cmp = if dy < 0 { 0xffff_ffff } else { 0x0 };
+            for (dest, j) in first.iter_mut().zip(xor_bits.iter()) {
+                let dy_mask = (cmp ^ j) as i32;
+                *dest &= dy_mask;
+            }
 
-        let mut src = self.int_img.as_mut_ptr();
-        unsafe {
-            for _ in 0..self.length {
-                dx = *grad_x_ptr;
-                grad_x_ptr = grad_x_ptr.offset(1);
-                dy = *grad_y_ptr;
-                grad_y_ptr = grad_y_ptr.offset(1);
-
-                cmp = if dy < 0 { 0xffff_ffff } else { 0x0 };
-                for j in xor_bits.iter().take(4) {
-                    dy_mask = (cmp ^ j) as i32;
-                    *src &= dy_mask;
-                    src = src.offset(1);
-                }
-
-                cmp = if dx < 0 { 0xffff_ffff } else { 0x0 };
-                for j in xor_bits.iter().take(4) {
-                    dx_mask = (cmp ^ j) as i32;
-                    *src &= dx_mask;
-                    src = src.offset(1);
-                }
+            let cmp = if dx < 0 { 0xffff_ffff } else { 0x0 };
+            for (dest, j) in second.iter_mut().zip(xor_bits.iter()) {
+                let dx_mask = (cmp ^ j) as i32;
+                *dest &= dx_mask;
             }
         }
     }
