@@ -243,39 +243,36 @@ impl SurfMlpFeatureMap {
     }
 
     fn integral(&mut self) {
-        let data = self.int_img.as_ptr();
         let len = (FeaturePool::K_NUM_INT_CHANNEL * self.width) as usize;
 
-        unsafe {
-            for r in 0..(self.height - 1) as isize {
-                let row1 = data.offset(r * len as isize);
-                let row2 = row1.add(len);
-                math::vector_add(row1, row2, row2 as *mut i32, len);
+        let mut row_iter = self.int_img.chunks_exact_mut(len);
+        if let Some(mut row1) = row_iter.next() {
+            for row2 in row_iter {
+                math::vector_add_safe(row1, row2);
+                row1 = row2;
             }
+        }
 
-            for r in 0..self.height as isize {
-                SurfMlpFeatureMap::vector_cumulative_add(
-                    data.offset(r * len as isize),
-                    len,
-                    FeaturePool::K_NUM_INT_CHANNEL,
-                );
-            }
+        // TODO: Optimize to use previous for
+        for row in self.int_img.chunks_exact_mut(len) {
+            SurfMlpFeatureMap::vector_cumulative_add(
+                row,
+                FeaturePool::K_NUM_INT_CHANNEL,
+            )
         }
     }
 
     #[inline]
-    fn vector_cumulative_add(x: *const i32, len: usize, num_channel: u32) {
-        SurfMlpFeatureMap::vector_cumulative_add_portable(x, len, num_channel);
+    fn vector_cumulative_add(x: &mut[i32], num_channel: u32) {
+        SurfMlpFeatureMap::vector_cumulative_add_portable(x, num_channel);
     }
 
-    fn vector_cumulative_add_portable(x: *const i32, len: usize, num_channel: u32) {
-        unsafe {
-            let num_channel = num_channel as usize;
-            let cols = len / num_channel - 1;
-            for i in 0..cols as isize {
-                let col1 = x.offset(i * num_channel as isize);
-                let col2 = col1.add(num_channel);
-                math::vector_add(col1, col2, col2 as *mut i32, num_channel);
+    fn vector_cumulative_add_portable(x: &mut[i32], num_channel: u32) {
+        let mut col_iter = x.chunks_exact_mut(num_channel as usize);
+        if let Some(mut col1) = col_iter.next() {
+            for col2 in col_iter {
+                math::vector_add_safe(col1, col2);
+                col1 = col2;
             }
         }
     }

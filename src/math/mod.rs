@@ -42,6 +42,12 @@ pub unsafe fn vector_add(left: *const i32, right: *const i32, dest: *mut i32, le
     }
 }
 
+pub fn vector_add_safe(left: &[i32], right_and_dest: &mut[i32]) {
+    for (left, right_and_dest) in left.iter().copied().zip(right_and_dest.iter_mut()) {
+        *right_and_dest += left;
+    }
+}
+
 pub unsafe fn vector_sub(left: *const i32, right: *const i32, dest: *mut i32, length: usize) {
     for i in 0..length as isize {
         *dest.offset(i) = *left.offset(i) - *right.offset(i);
