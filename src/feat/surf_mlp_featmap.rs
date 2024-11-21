@@ -122,7 +122,7 @@ impl SurfMlpFeatureMap {
 
             let (_, src_offset_2) = src_row.split_at(2);
             let (_, dest_offset_1) = dest_row.split_at_mut(1);
-            math::vector_sub_safe(src_offset_2, src_row, dest_offset_1);
+            math::vector_sub(src_offset_2, src_row, dest_offset_1);
 
             let mut src_iter = src_row.iter().copied();
             let src_last = src_iter.next_back().unwrap();
@@ -135,7 +135,7 @@ impl SurfMlpFeatureMap {
         let mut src_row_iter = self.img_buf.chunks_exact(self.width as usize);
         let src_row_first = src_row_iter.next().unwrap();
         let src_row_second = src_row_iter.next().unwrap();
-        math::vector_sub_safe(src_row_second, src_row_first, &mut self.grad_y);
+        math::vector_sub(src_row_second, src_row_first, &mut self.grad_y);
         math::vector_mul(&mut self.grad_y[..self.width as usize], 2);
 
         let row_len = self.width as usize;
@@ -152,14 +152,14 @@ impl SurfMlpFeatureMap {
             .zip(self.grad_y[row_len..last_row_start].chunks_exact_mut(row_len));
 
         iter.for_each(|((src_row, src_row_next_twice), dest)| {
-            math::vector_sub_safe(src_row_next_twice, src_row, dest);
+            math::vector_sub(src_row_next_twice, src_row, dest);
         });
 
         let mut src_row_iter = self.img_buf.chunks_exact(self.width as usize);
         let src_row_last = src_row_iter.next_back().unwrap();
         let src_row_second_last = src_row_iter.next_back().unwrap();
         let dest_row_last = self.grad_y.chunks_exact_mut(self.width as usize).last().unwrap();
-        math::vector_sub_safe(
+        math::vector_sub(
             src_row_last,
             src_row_second_last,
             dest_row_last,
@@ -214,7 +214,7 @@ impl SurfMlpFeatureMap {
         let mut row_iter = self.int_img.chunks_exact_mut(len);
         if let Some(mut row1) = row_iter.next() {
             for row2 in row_iter {
-                math::vector_add_safe(row1, row2);
+                math::vector_add(row1, row2);
                 row1 = row2;
             }
         }
@@ -237,7 +237,7 @@ impl SurfMlpFeatureMap {
         let mut col_iter = x.chunks_exact_mut(num_channel as usize);
         if let Some(mut col1) = col_iter.next() {
             for col2 in col_iter {
-                math::vector_add_safe(col1, col2);
+                math::vector_add(col1, col2);
                 col1 = col2;
             }
         }

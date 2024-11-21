@@ -83,30 +83,22 @@ fn bench_abs(c: &mut Criterion) {
     });
 }
 
-fn bench_vector_add_dest(c: &mut Criterion) {
-    c.bench_function("math_vector_add dest", move |b| {
-        let src: Vec<_> = (0..500).collect();
+fn bench_vector_add(c: &mut Criterion) {
+    c.bench_function("math_vector_add", move |b| {
+        let left: Vec<_> = (0..500).collect();
+        let mut right_and_dest = vec![0; 500];
+        b.iter(|| {
+            vector_add(&left, &mut right_and_dest);
+        })
+    });
+}
+
+fn bench_vector_sub(c: &mut Criterion) {
+    c.bench_function("math_vector_sub", move |b| {
+        let vec: Vec<_> = (0..500).collect();
         let mut dest = vec![0; 500];
         b.iter(|| {
-            unsafe { vector_add(src.as_ptr(), src.as_ptr(), dest.as_mut_ptr(), src.len()) };
-        })
-    });
-}
-
-fn bench_vector_add_inplace(c: &mut Criterion) {
-    c.bench_function("math_vector_add in-place", move |b| {
-        let mut vec: Vec<_> = (0..500).collect();
-        b.iter(|| {
-            unsafe { vector_add(vec.as_ptr(), vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
-        })
-    });
-}
-
-fn bench_vector_sub_inplace(c: &mut Criterion) {
-    c.bench_function("math_vector_sub in-place", move |b| {
-        let mut vec: Vec<_> = (0..500).collect();
-        b.iter(|| {
-            unsafe { vector_sub(vec.as_ptr(), vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
+            vector_sub(&vec, &vec, &mut dest);
         })
     });
 }
@@ -193,9 +185,8 @@ criterion_group!(
     math,
     bench_square,
     bench_abs,
-    bench_vector_add_dest,
-    bench_vector_add_inplace,
-    bench_vector_sub_inplace,
+    bench_vector_add,
+    bench_vector_sub,
     bench_vector_inner_product
 );
 criterion_group!(math_compare, bench_square_compare, bench_abs_compare);

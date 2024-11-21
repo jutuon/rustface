@@ -36,25 +36,13 @@ pub fn abs(src: &[i32], dest: &mut [i32]) {
     }
 }
 
-pub unsafe fn vector_add(left: *const i32, right: *const i32, dest: *mut i32, length: usize) {
-    for i in 0..length as isize {
-        *dest.offset(i) = *left.offset(i) + *right.offset(i);
-    }
-}
-
-pub fn vector_add_safe(left: &[i32], right_and_dest: &mut[i32]) {
+pub fn vector_add(left: &[i32], right_and_dest: &mut[i32]) {
     for (left, right_and_dest) in left.iter().copied().zip(right_and_dest.iter_mut()) {
         *right_and_dest += left;
     }
 }
 
-pub unsafe fn vector_sub(left: *const i32, right: *const i32, dest: *mut i32, length: usize) {
-    for i in 0..length as isize {
-        *dest.offset(i) = *left.offset(i) - *right.offset(i);
-    }
-}
-
-pub fn vector_sub_safe(left: &[i32], right: &[i32], dest: &mut [i32]) {
+pub fn vector_sub(left: &[i32], right: &[i32], dest: &mut [i32]) {
     for ((left, right), dest) in left.iter().copied().zip(right.iter().copied()).zip(dest.iter_mut()) {
         *dest = left - right;
     }
@@ -102,16 +90,18 @@ mod tests {
 
     #[test]
     fn test_vector_add() {
-        let mut vec = vec![1, 2, 3];
-        unsafe { vector_add(vec.as_ptr(), vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
-        assert_eq!(vec![2, 4, 6], vec);
+        let left = vec![1, 2, 3];
+        let mut right_and_dest = vec![1, 2, 3];
+        vector_add(&left, &mut right_and_dest);
+        assert_eq!(vec![2, 4, 6], right_and_dest);
     }
 
     #[test]
     fn test_vector_sub() {
-        let mut vec = vec![1, 2, 3];
-        unsafe { vector_sub(vec.as_ptr(), vec.as_ptr(), vec.as_mut_ptr(), vec.len()) };
-        assert_eq!(vec![0, 0, 0], vec);
+        let src = vec![1, 2, 3];
+        let mut dest = vec![1, 2, 3];
+        vector_sub(&src, &src, &mut dest);
+        assert_eq!(vec![0, 0, 0], dest);
     }
 
     #[test]

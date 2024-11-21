@@ -202,7 +202,7 @@ impl LabBoostedFeatureMap {
         let rect_sum = self.rect_sum.as_mut_slice();
 
         rect_sum[0] = int_img[((self.rect_height - 1) * self.width + self.rect_width - 1) as usize];
-        math::vector_sub_safe(
+        math::vector_sub(
             &int_img[((self.rect_height - 1) * self.width + self.rect_width) as usize..],
             &int_img[((self.rect_height - 1) * self.width) as usize..],
             &mut rect_sum[1..][..width],
@@ -218,7 +218,7 @@ impl LabBoostedFeatureMap {
             dest[0] = bottom_right[0] - top_right[0];
             dest = &mut dest[1..][..width];
 
-            math::vector_sub_safe(&bottom_right[1..], &top_right[1..], dest);
+            math::vector_sub(&bottom_right[1..], &top_right[1..], dest);
             math::vector_calculation(bottom_left, dest, |bottom_left, dest| dest - bottom_left);
             math::vector_calculation(top_left, dest, |top_left, dest| dest + top_left);
         }
