@@ -17,7 +17,7 @@
 // If not, see < https://opensource.org/licenses/BSD-2-Clause>.
 
 use std::cmp::Ordering::*;
-use std::{cmp, ptr};
+use std::cmp;
 
 use crate::classifier::{Classifier, Score, SurfMlpBuffers};
 use crate::common::{resize_image, FaceInfo, ImageData, ImagePyramid, Rectangle, Seq};
@@ -105,6 +105,40 @@ impl Detector for FuStDetector {
 #[inline]
 fn is_legal_image(image: &ImageData) -> bool {
     image.num_channels() == 1 && image.width() > 0 && image.height() > 0
+}
+
+struct Cursor<'a> {
+    all_data: &'a mut[u8],
+    offset: isize,
+}
+
+impl <'a> Cursor<'a> {
+    fn with_offset(all_data: &'a mut [u8], offset: isize) -> Self {
+        Self {
+            all_data,
+            offset,
+        }
+    }
+
+    fn offset(self, offset: isize) -> Self {
+        let new_offset = self.offset + offset;
+        Self {
+            all_data: self.all_data,
+            offset: new_offset,
+        }
+    }
+
+    fn all_data_and_offset(&mut self, action: impl Fn(&mut [u8], isize)) {
+        action(self.all_data, self.offset);
+    }
+
+    fn write_bytes(&mut self, value: u8, len: usize) {
+        self.all_data[self.offset as usize..][..len].fill(value);
+    }
+
+    fn copy(&mut self, src: &[u8]) {
+        self.all_data[self.offset as usize..][..src.len()].copy_from_slice(src);
+    }
 }
 
 pub struct FuStDetector {
@@ -203,71 +237,94 @@ impl FuStDetector {
 
         self.wnd_data_buf
             .resize((roi_width * roi_height) as usize, 0);
-        let mut src;
-        unsafe {
-            src = img
-                .data()
-                .as_ptr()
-                .offset((roi.y() * img_width + roi.x()) as isize);
-        }
-        let mut dest = self.wnd_data_buf.as_mut_ptr();
+
+        let mut src = &img.data()[(roi.y() * img_width + roi.x()) as usize..];
+        let mut dest = Cursor::with_offset(self.wnd_data_buf.as_mut_slice(), 0);
         let len = roi_width as usize;
         let len2 = (roi_width - pad_left - pad_right) as usize;
 
         if pad_top > 0 {
-            unsafe {
-                ptr::write_bytes(dest, 0, len * pad_top as usize);
-                dest = dest.offset((roi_width * pad_top) as isize);
-            }
+            dest.write_bytes(0, len * pad_top as usize);
+            dest = dest.offset((roi_width * pad_top) as isize);
         }
 
         match (pad_left, pad_right) {
             (0, 0) => {
                 for _y in pad_top..(roi_height - pad_bottom) {
-                    unsafe {
-                        ptr::copy_nonoverlapping(src, dest, len);
-                        src = src.offset(img_width as isize);
-                        dest = dest.offset(roi_width as isize);
+                    dest.copy(&src[..len]);
+
+                    if src.len() > img_width as usize {
+                        src = &src[img_width as usize..];
+                    } else {
+                        // Panic if for loop continues
+                        src = &[];
                     }
+
+                    dest = dest.offset(roi_width as isize);
                 }
             }
             (0, _) => {
                 for _y in pad_top..(roi_height - pad_bottom) {
-                    unsafe {
-                        ptr::copy_nonoverlapping(src, dest, len2);
-                        src = src.offset(img_width as isize);
-                        dest = dest.offset(roi_width as isize);
-                        ptr::write_bytes(dest.offset(-pad_right as isize), 0, pad_right as usize);
+                    dest.copy(&src[..len2]);
+
+                    if src.len() > img_width as usize {
+                        src = &src[img_width as usize..];
+                    } else {
+                        // Panic if for loop continues
+                        src = &[];
                     }
+
+                    dest = dest.offset(roi_width as isize);
+                    dest.all_data_and_offset(|all_data, offset| {
+                        Cursor::with_offset(all_data, offset + (-pad_right as isize))
+                            .write_bytes(0, pad_right as usize);
+                    })
                 }
             }
             (_, 0) => {
                 for _y in pad_top..(roi_height - pad_bottom) {
-                    unsafe {
-                        ptr::write_bytes(dest, 0, pad_left as usize);
-                        ptr::copy_nonoverlapping(src, dest.offset(pad_left as isize), len2);
-                        src = src.offset(img_width as isize);
-                        dest = dest.offset(roi_width as isize);
+                    dest.write_bytes(0, pad_left as usize);
+                    dest.all_data_and_offset(|all_data, offset| {
+                        Cursor::with_offset(all_data, offset + pad_left as isize)
+                            .copy(&src[..len2]);
+                    });
+
+                    if src.len() > img_width as usize {
+                        src = &src[img_width as usize..];
+                    } else {
+                        // Panic if for loop continues
+                        src = &[];
                     }
+
+                    dest = dest.offset(roi_width as isize);
                 }
             }
             (_, _) => {
                 for _y in pad_top..(roi_height - pad_bottom) {
-                    unsafe {
-                        ptr::write_bytes(dest, 0, pad_left as usize);
-                        ptr::copy_nonoverlapping(src, dest.offset(pad_left as isize), len2);
-                        src = src.offset(img_width as isize);
-                        dest = dest.offset(roi_width as isize);
-                        ptr::write_bytes(dest.offset(-pad_right as isize), 0, pad_right as usize);
+                    dest.write_bytes(0, pad_left as usize);
+                    dest.all_data_and_offset(|all_data, offset| {
+                        Cursor::with_offset(all_data, offset + pad_left as isize)
+                            .copy(&src[..len2]);
+                    });
+
+                    if src.len() > img_width as usize {
+                        src = &src[img_width as usize..];
+                    } else {
+                        // Panic if for loop continues
+                        src = &[];
                     }
+
+                    dest = dest.offset(roi_width as isize);
+                    dest.all_data_and_offset(|all_data, offset| {
+                        Cursor::with_offset(all_data, offset + (-pad_right as isize))
+                            .write_bytes(0, pad_right as usize);
+                    });
                 }
             }
         }
 
         if pad_bottom > 0 {
-            unsafe {
-                ptr::write_bytes(dest, 0, len * pad_bottom as usize);
-            }
+            dest.write_bytes(0, len * pad_bottom as usize);
         }
 
         let src_img = ImageData::new(&self.wnd_data_buf, roi.width(), roi.height());
