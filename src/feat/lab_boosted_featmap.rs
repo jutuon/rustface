@@ -198,34 +198,29 @@ impl LabBoostedFeatureMap {
         let width = (self.width - self.rect_width) as usize;
         let height = self.height - self.rect_height;
 
-        let int_img_ptr = self.int_img.as_ptr();
-        let rect_sum_ptr = self.rect_sum.as_mut_ptr();
+        let int_img = self.int_img.as_slice();
+        let rect_sum = self.rect_sum.as_mut_slice();
 
-        unsafe {
-            *rect_sum_ptr = *(int_img_ptr
-                .offset(((self.rect_height - 1) * self.width + self.rect_width - 1) as isize));
-            math::vector_sub(
-                int_img_ptr
-                    .offset(((self.rect_height - 1) * self.width + self.rect_width) as isize),
-                int_img_ptr.offset(((self.rect_height - 1) * self.width) as isize),
-                rect_sum_ptr.offset(1),
-                width,
-            );
+        rect_sum[0] = int_img[((self.rect_height - 1) * self.width + self.rect_width - 1) as usize];
+        math::vector_sub_safe(
+            &int_img[((self.rect_height - 1) * self.width + self.rect_width) as usize..],
+            &int_img[((self.rect_height - 1) * self.width) as usize..],
+            &mut rect_sum[1..][..width],
+        );
 
-            for i in 1..(height + 1) {
-                let top_left = int_img_ptr.offset(((i - 1) * self.width) as isize);
-                let top_right = top_left.offset((self.rect_width - 1) as isize);
-                let bottom_left = top_left.offset((self.rect_height * self.width) as isize);
-                let bottom_right = bottom_left.offset((self.rect_width - 1) as isize);
+        for i in 1..(height + 1) {
+            let top_left = &int_img[((i - 1) * self.width) as usize..];
+            let top_right = &top_left[(self.rect_width - 1) as usize..];
+            let bottom_left = &top_left[(self.rect_height * self.width) as usize..];
+            let bottom_right = &bottom_left[(self.rect_width - 1) as usize..];
 
-                let mut dest = rect_sum_ptr.offset((i * self.width) as isize);
-                *dest = *bottom_right - *top_right;
-                dest = dest.offset(1);
+            let mut dest = &mut rect_sum[(i * self.width) as usize..];
+            dest[0] = bottom_right[0] - top_right[0];
+            dest = &mut dest[1..][..width];
 
-                math::vector_sub(bottom_right.offset(1), top_right.offset(1), dest, width);
-                math::vector_sub(dest, bottom_left, dest, width);
-                math::vector_add(dest, top_left, dest, width);
-            }
+            math::vector_sub_safe(&bottom_right[1..], &top_right[1..], dest);
+            math::vector_calculation(bottom_left, dest, |bottom_left, dest| dest - bottom_left);
+            math::vector_calculation(top_left, dest, |top_left, dest| dest + top_left);
         }
     }
 

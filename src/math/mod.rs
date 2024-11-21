@@ -74,6 +74,12 @@ pub fn vector_inner_product(left: &[f32], right: &[f32]) -> f32 {
         .sum()
 }
 
+pub fn vector_calculation(src: &[i32], dest: &mut [i32], calculation: impl Fn(i32, i32) -> i32) {
+    for (src, dest) in src.iter().copied().zip(dest.iter_mut()) {
+        *dest = calculation(src, *dest);
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -120,5 +126,13 @@ mod tests {
         let vec = vec![1.0, 2.0, 3.0];
         let result = vector_inner_product(&vec, &vec);
         assert_eq!(14.0, result);
+    }
+
+    #[test]
+    fn test_vector_calculation() {
+        let src = vec![1, 2, 3];
+        let mut dest = vec![1, 2, 3];
+        vector_calculation(&src, &mut dest, |src, dest| src + dest);
+        assert_eq!(vec![2, 4, 6], dest);
     }
 }
