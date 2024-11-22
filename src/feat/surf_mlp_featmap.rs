@@ -215,16 +215,16 @@ impl SurfMlpFeatureMap {
         if let Some(mut row1) = row_iter.next() {
             for row2 in row_iter {
                 math::vector_add(row1, row2);
+                SurfMlpFeatureMap::vector_cumulative_add(
+                    row1,
+                    FeaturePool::K_NUM_INT_CHANNEL,
+                );
                 row1 = row2;
             }
-        }
-
-        // TODO: Optimize to use previous for
-        for row in self.int_img.chunks_exact_mut(len) {
             SurfMlpFeatureMap::vector_cumulative_add(
-                row,
+                row1,
                 FeaturePool::K_NUM_INT_CHANNEL,
-            )
+            );
         }
     }
 
